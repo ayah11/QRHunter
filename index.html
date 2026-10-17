@@ -146,6 +146,10 @@ const FIREBASE_CONFIG = {
 */
 const ADMIN_PASSWORD_SHA256 = "9044ba27f5039552395a3d58c5fa6b95c53849262b23d9a0e33774684dd0d8d4";
 const ROOT = "qrhunt"; // all data lives under this path
+// Link printed inside every QR code. Must match where this page is hosted.
+const SITE_URL = "https://ayah11.github.io/QRHunter/";
+// Fixed spot codes. They match the printed QR PDF, so do not change them.
+const FIXED_CODES = ["MF988CZB","SSA7QP9T","8AZSKXTS","3JS9YNBN","3A7FEHJK","98HFJM4Y","BUL48C8F","6RYJGWWU","WYCFPQMH","4WMB2QTY"];
 
 /* ================= Storage layer ================= */
 const clone = v => v === undefined ? undefined : JSON.parse(JSON.stringify(v));
@@ -199,7 +203,7 @@ const rnd = (n, chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789") => Array.from(crypto
 const DEFAULT_CFG = { eventName: "QR Hunt", target: 10, maxGifts: 0, rotate: false, rotateSec: 60, activeCode: "", activatedAt: 0, token: "", prevToken: "", winners: 0, codes: {} };
 const withDefaults = c => Object.assign({}, DEFAULT_CFG, c || {}, { codes: (c && c.codes) || {} });
 const sortedCodes = cfg => Object.entries(cfg.codes).sort((a, b) => a[1].n - b[1].n);
-const codeUrl = (id, token) => BASE + "?c=" + encodeURIComponent(id) + (token ? "&t=" + encodeURIComponent(token) : "");
+const codeUrl = (id, token) => (SITE_URL || BASE) + "?c=" + encodeURIComponent(id) + (token ? "&t=" + encodeURIComponent(token) : "");
 function drawQR(el, text, size) {
   el.innerHTML = "";
   new QRCode(el, { text, width: size, height: size, colorDark: "#003264", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.M });
@@ -500,7 +504,13 @@ function Admin() {
   let first = true;
   Store.on("config", async v => {
     cfg = withDefaults(v);
-    if (first) { first = false; if (!Object.keys(cfg.codes).length) { await addSpots(10); return; } }
+    if (first) {
+      first = false;
+      if (!Object.keys(cfg.codes).length) {
+        const upd = {}; FIXED_CODES.forEach((id, i) => upd["codes/" + id] = { n: i + 1, label: "" });
+        await Store.update("config", upd); return;
+      }
+    }
     fill(); renderActive(); renderSpots(); renderPlayers();
   });
   Store.on("players", v => { players = v || {}; renderActive(); renderSpots(); renderPlayers(); });
