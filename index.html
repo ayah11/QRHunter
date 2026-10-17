@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>QR Hunt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+:root{--navy:#003264;--lime:#c6f700;--blue:#0096f9;--green:#339902;--bg:#f3f6fa;--card:#fff;--text:#003264;--muted:#5b7090;--line:#dbe3ee;--red:#d93838}
+*{box-sizing:border-box}
+html,body{margin:0;font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--text)}
+button,input,select{font-family:inherit;font-size:16px}
+button{cursor:pointer;border:0;border-radius:12px;padding:10px 16px;font-weight:700;background:var(--navy);color:#fff}
+button.lime{background:var(--lime);color:var(--navy)}
+button.blue{background:var(--blue)}
+button.green{background:var(--green)}
+button.ghost{background:transparent;color:var(--navy);border:2px solid var(--line)}
+button.red{background:var(--red)}
+button.sm{padding:6px 12px;font-size:14px;border-radius:9px}
+button:disabled{opacity:.5;cursor:default}
+input,select{width:100%;padding:12px 14px;border:2px solid var(--line);border-radius:12px;background:#fff;color:var(--text)}
+input:focus{outline:none;border-color:var(--blue)}
+label{display:block;font-weight:600;font-size:14px;margin:12px 0 4px}
+.hide{display:none!important}
+a{color:var(--blue)}
+
+/* ---------- Player ---------- */
+.player{min-height:100vh;background:var(--navy);color:#fff;padding:24px 16px 40px;display:flex;flex-direction:column;align-items:center}
+.player .top{width:100%;max-width:440px;display:flex;justify-content:space-between;align-items:center}
+.player .logo{font-weight:900;font-size:22px;letter-spacing:.5px}
+.player .logo span{color:var(--lime)}
+.langbtn{background:rgba(255,255,255,.12);color:#fff;padding:6px 14px;font-size:14px}
+.pcard{width:100%;max-width:440px;background:#fff;color:var(--navy);border-radius:24px;padding:24px 20px;margin-top:20px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.pcard h1{margin:6px 0 4px;font-size:28px;line-height:1.3}
+.pcard p{margin:6px 0;color:var(--muted);font-size:16px;line-height:1.6}
+.pcard form{text-align:start}
+.pcard .big{font-size:56px;line-height:1}
+.dots{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:18px 0 6px}
+.dot{width:30px;height:30px;border-radius:50%;border:3px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:transparent}
+.dot.on{background:var(--lime);border-color:var(--lime);color:var(--navy)}
+.dot.new{animation:pop .6s ease}
+@keyframes pop{0%{transform:scale(.3)}60%{transform:scale(1.3)}100%{transform:scale(1)}}
+.count{font-size:22px;font-weight:900}
+.msg{border-radius:14px;padding:12px;margin:14px 0 0;font-weight:700}
+.msg.ok{background:#eef9d0;color:var(--green)}
+.msg.warn{background:#fff4dc;color:#a36a00}
+.msg.bad{background:#fde8e8;color:var(--red)}
+.win{background:linear-gradient(135deg,var(--lime),#7be0ff,var(--lime));background-size:300% 300%;animation:shine 3s ease infinite}
+@keyframes shine{0%{background-position:0 50%}50%{background-position:100% 50%}100%{background-position:0 50%}}
+.wincode{font-size:44px;font-weight:900;letter-spacing:8px;background:var(--navy);color:var(--lime);border-radius:16px;padding:8px 0;margin:12px 0}
+.clock{font-size:15px;font-weight:700;color:var(--navy);opacity:.75}
+.notme{background:none;color:rgba(255,255,255,.6);font-weight:600;font-size:14px;margin-top:16px;text-decoration:underline}
+.pulse{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--green);margin-inline-end:6px;animation:pl 1s infinite}
+@keyframes pl{50%{opacity:.2}}
+
+/* ---------- Admin ---------- */
+.admin{max-width:1100px;margin:0 auto;padding:16px 16px 60px}
+.ahead{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin-bottom:14px}
+.ahead h1{margin:0;font-size:24px}
+.badge{display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle;margin-inline-start:6px}
+.badge.live{background:#e3f7d6;color:var(--green)}
+.badge.demo{background:#fff4dc;color:#a36a00}
+.links{display:flex;flex-wrap:wrap;gap:8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:820px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border-radius:18px;padding:18px;border:1px solid var(--line)}
+.card h2{margin:0 0 10px;font-size:18px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.active-box{display:flex;gap:16px;align-items:center}
+.active-box .qr{flex:none;background:#fff;padding:8px;border-radius:12px;border:1px solid var(--line)}
+.active-box .qr img,.active-box .qr canvas{display:block}
+.active-name{font-size:26px;font-weight:900;line-height:1.2}
+.muted{color:var(--muted);font-size:14px}
+.spots{display:flex;flex-direction:column;gap:8px;max-height:420px;overflow:auto}
+.spot{display:flex;gap:8px;align-items:center;padding:8px;border:2px solid var(--line);border-radius:12px}
+.spot.on{border-color:var(--lime);background:#f8ffe0}
+.spot .n{flex:none;width:34px;height:34px;border-radius:10px;background:var(--navy);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center}
+.spot input{padding:7px 10px;font-size:15px}
+.spot .done{flex:none;font-size:12px;color:var(--muted);min-width:44px;text-align:center}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.toggle{display:flex;align-items:center;gap:10px;margin-top:14px;font-weight:600}
+.toggle input{width:22px;height:22px}
+.stats{display:flex;gap:10px;margin-bottom:12px}
+.stat{flex:1;background:var(--bg);border-radius:12px;padding:10px;text-align:center}
+.stat b{display:block;font-size:26px;line-height:1.1}
+.stat span{font-size:13px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{text-align:start;padding:9px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:13px;color:var(--muted);font-weight:700}
+.bar{height:8px;background:var(--line);border-radius:8px;overflow:hidden;min-width:60px}
+.bar i{display:block;height:100%;background:var(--blue)}
+.tag{font-size:12px;font-weight:700;padding:3px 8px;border-radius:8px;white-space:nowrap}
+.tag.win{background:var(--lime);color:var(--navy);animation:none}
+.tag.given{background:#e3f7d6;color:var(--green)}
+.tag.nogift{background:#eee;color:#666}
+.modal{position:fixed;inset:0;background:rgba(0,30,60,.7);display:flex;align-items:center;justify-content:center;padding:16px;z-index:9}
+.modal .box{background:#fff;border-radius:20px;padding:20px;text-align:center;max-width:360px;width:100%}
+.modal .qrbig{display:flex;justify-content:center;margin:12px 0}
+.login{max-width:360px;margin:15vh auto;padding:0 16px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:12px;font-weight:700;z-index:10}
+
+/* ---------- Screen ---------- */
+.screen{min-height:100vh;background:var(--navy);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;color:#fff;text-align:center}
+.screen h1{font-size:clamp(28px,6vw,64px);margin:0}
+.screen h1 span{color:var(--lime)}
+.screen .qrwrap{background:#fff;padding:20px;border-radius:28px;margin:24px 0}
+.screen .qrwrap img,.screen .qrwrap canvas{display:block;width:min(70vmin,520px)!important;height:auto!important}
+.screen .tbar{width:min(70vmin,520px);height:10px;background:rgba(255,255,255,.2);border-radius:10px;overflow:hidden}
+.screen .tbar i{display:block;height:100%;background:var(--lime);transition:width 1s linear}
+.screen .sub{font-size:clamp(16px,3vw,28px);opacity:.85;margin-top:10px}
+
+/* ---------- Print ---------- */
+.print{max-width:900px;margin:0 auto;padding:16px}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.pcode{border:3px solid var(--navy);border-radius:20px;padding:20px;text-align:center;break-inside:avoid;page-break-inside:avoid;background:#fff}
+.pcode h3{margin:0;font-size:28px;font-weight:900}
+.pcode h3 span{color:var(--blue)}
+.pcode .qr{display:flex;justify-content:center;margin:14px 0}
+.pcode .lbl{font-weight:700;font-size:14px;color:var(--muted)}
+@media print{.noprint{display:none!important}body{background:#fff}.print{padding:0}.pgrid{gap:10mm}.pcode{height:125mm}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* =========================================================
+   SETTINGS — edit these two lines
+   1) FIREBASE_CONFIG: paste your Firebase web config here.
+      Leave it null to run in DEMO mode (data stays on this
+      device only, good for testing).
+   2) ADMIN_PASSWORD_SHA256: SHA-256 of the admin password.
+      Default password is: maysalward
+   ========================================================= */
+const FIREBASE_CONFIG = null;
+/* example:
+const FIREBASE_CONFIG = {
+  apiKey: "...",
+  authDomain: "your-project.firebaseapp.com",
+  databaseURL: "https://your-project-default-rtdb.firebaseio.com",
+  projectId: "your-project"
+};
+*/
+const ADMIN_PASSWORD_SHA256 = "9044ba27f5039552395a3d58c5fa6b95c53849262b23d9a0e33774684dd0d8d4";
+const ROOT = "qrhunt"; // all data lives under this path
+
+/* ================= Storage layer ================= */
+const clone = v => v === undefined ? undefined : JSON.parse(JSON.stringify(v));
+const Store = (() => {
+  if (FIREBASE_CONFIG) {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    const db = firebase.database();
+    const r = p => db.ref(p ? ROOT + "/" + p : ROOT);
+    return {
+      live: true,
+      get: async p => (await r(p).get()).val(),
+      set: (p, v) => r(p).set(v),
+      update: (p, o) => r(p).update(o),
+      remove: p => r(p).remove(),
+      on: (p, cb) => { const h = s => cb(s.val()); r(p).on("value", h); return () => r(p).off("value", h); },
+      tx: async (p, fn) => { const res = await r(p).transaction(fn); return res.committed ? res.snapshot.val() : undefined; }
+    };
+  }
+  // DEMO mode: localStorage, synced between tabs on the same device
+  const KEY = "qrhunt_demo";
+  const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } };
+  const parts = p => (p || "").split("/").filter(Boolean);
+  const getAt = (d, p) => parts(p).reduce((o, k) => o == null ? undefined : o[k], d);
+  const setAt = (d, p, v) => {
+    const ks = parts(p); let o = d;
+    for (let i = 0; i < ks.length - 1; i++) { if (typeof o[ks[i]] !== "object" || o[ks[i]] === null) o[ks[i]] = {}; o = o[ks[i]]; }
+    const last = ks[ks.length - 1];
+    if (v === null || v === undefined) delete o[last]; else o[last] = v;
+  };
+  const subs = [];
+  const fire = () => { const d = load(); subs.forEach(s => s.cb(clone(getAt(d, s.p)) ?? null)); };
+  const save = d => { localStorage.setItem(KEY, JSON.stringify(d)); fire(); };
+  window.addEventListener("storage", e => { if (e.key === KEY) fire(); });
+  return {
+    live: false,
+    get: async p => clone(getAt(load(), p)) ?? null,
+    set: async (p, v) => { const d = load(); setAt(d, p, v); save(d); },
+    update: async (p, o) => { const d = load(); for (const k in o) setAt(d, (p ? p + "/" : "") + k, o[k]); save(d); },
+    remove: async p => { const d = load(); setAt(d, p, null); save(d); },
+    on: (p, cb) => { const s = { p, cb }; subs.push(s); cb(clone(getAt(load(), p)) ?? null); return () => subs.splice(subs.indexOf(s), 1); },
+    tx: async (p, fn) => { const d = load(); const v = fn(clone(getAt(d, p)) ?? null); if (v !== undefined) { setAt(d, p, v); save(d); } return v; }
+  };
+})();
+
+/* ================= Helpers ================= */
+const $ = s => document.querySelector(s);
+const app = $("#app");
+const BASE = location.href.split("#")[0].split("?")[0];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const rnd = (n, chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789") => Array.from(crypto.getRandomValues(new Uint32Array(n)), x => chars[x % chars.length]).join("");
+const DEFAULT_CFG = { eventName: "QR Hunt", target: 10, maxGifts: 0, rotate: false, rotateSec: 60, activeCode: "", activatedAt: 0, token: "", prevToken: "", winners: 0, codes: {} };
+const withDefaults = c => Object.assign({}, DEFAULT_CFG, c || {}, { codes: (c && c.codes) || {} });
+const sortedCodes = cfg => Object.entries(cfg.codes).sort((a, b) => a[1].n - b[1].n);
+const codeUrl = (id, token) => BASE + "?c=" + encodeURIComponent(id) + (token ? "&t=" + encodeURIComponent(token) : "");
+function drawQR(el, text, size) {
+  el.innerHTML = "";
+  new QRCode(el, { text, width: size, height: size, colorDark: "#003264", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.M });
+}
+function toast(t) { const d = document.createElement("div"); d.className = "toast"; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 1800); }
+const timeStr = ts => ts ? new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+async function sha256(t) {
+  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t));
+  return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
+}
+
+/* Admin login gate (used by admin, screen and print pages) */
+function requireAdmin(next) {
+  if (sessionStorage.getItem("qh_admin") === "1") return next();
+  app.innerHTML = `<div class="login card"><h2>Admin login</h2>
+    <form id="lf"><label>Password</label><input id="pw" type="password" autofocus>
+    <p id="lerr" class="msg bad hide">Wrong password</p>
+    <button style="width:100%;margin-top:14px">Enter</button></form></div>`;
+  $("#lf").onsubmit = async e => {
+    e.preventDefault();
+    let ok = false;
+    try { ok = (await sha256($("#pw").value)) === ADMIN_PASSWORD_SHA256; } catch (err) { alert("Open this page over https to log in."); }
+    if (ok) { sessionStorage.setItem("qh_admin", "1"); next(); } else $("#lerr").classList.remove("hide");
+  };
+}
+
+/* ================= PLAYER ================= */
+const T = {
+  en: {
+    dir: "ltr", other: "عربي", title: "QR Hunt",
+    intro: "A QR code is hidden somewhere at the event. It moves during the day!",
+    goal: n => `Find and scan it ${n} times, in ${n} different places, to win a gift.`,
+    name: "Your name", phone: "Phone number", start: "Start playing",
+    errName: "Please write your name.", errPhone: "Please write a correct phone number.",
+    found: "You found it!", progress: (a, b) => `${a} of ${b}`,
+    already: "You already scanned this place. Wait for the code to move!",
+    old: "This code is not active now. Find its new place!",
+    expired: "This code expired. Scan the screen again.",
+    keep: "Keep hunting! The code will move soon.",
+    ready: "You are in! Find the QR code and scan it with your phone camera.",
+    win: "You won!", showStaff: "Show this screen to our team to get your gift.",
+    claimed: "Gift received. Thank you for playing!",
+    noGifts: "You finished the challenge! Sorry, all gifts are given.",
+    notMe: "Not you? Change player", hello: n => `Hi ${n}`, wait: "Loading..."
+  },
+  ar: {
+    dir: "rtl", other: "English", title: "صيد الرمز",
+    intro: "رمز QR مخفي في مكان ما في الفعالية، ومكانه يتغير خلال اليوم!",
+    goal: n => `ابحث عنه وامسحه ${n} مرات في ${n} أماكن مختلفة واربح هدية.`,
+    name: "اسمك", phone: "رقم الهاتف", start: "ابدأ اللعب",
+    errName: "الرجاء كتابة اسمك.", errPhone: "الرجاء كتابة رقم هاتف صحيح.",
+    found: "وجدته!", progress: (a, b) => `${a} من ${b}`,
+    already: "لقد مسحت هذا المكان من قبل. انتظر حتى يتغير مكان الرمز!",
+    old: "هذا الرمز غير فعّال الآن. ابحث عن مكانه الجديد!",
+    expired: "انتهت صلاحية الرمز. امسح الشاشة مرة أخرى.",
+    keep: "تابع البحث! سيتغير مكان الرمز قريباً.",
+    ready: "تم تسجيلك! ابحث عن رمز QR وامسحه بكاميرا هاتفك.",
+    win: "مبروك! لقد فزت!", showStaff: "أظهر هذه الشاشة لفريقنا لتستلم هديتك.",
+    claimed: "تم استلام الهدية. شكراً لمشاركتك!",
+    noGifts: "أكملت التحدي! للأسف، نفدت الهدايا.",
+    notMe: "لست أنت؟ غيّر اللاعب", hello: n => `أهلاً ${n}`, wait: "جارٍ التحميل..."
+  }
+};
+
+function Player() {
+  const params = new URLSearchParams(location.search);
+  let lang = localStorage.getItem("qh_lang") || ((navigator.language || "").startsWith("ar") ? "ar" : "en");
+  let pid = localStorage.getItem("qh_pid");
+  let cfg = withDefaults(null), player = null, result = null, newDot = -1, regError = "";
+  let clockTimer = null;
+
+  const view = () => {
+    const t = T[lang];
+    document.documentElement.lang = lang; document.documentElement.dir = t.dir;
+    const target = cfg.target;
+    const count = player ? Object.keys(player.scans || {}).length : 0;
+    let body = "";
+
+    if (!pid || !player) {
+      body = `<div class="pcard"><div class="big">🔍</div><h1>${t.title}</h1>
+        <p>${t.intro}</p><p><b>${t.goal(target)}</b></p>
+        <form id="rf"><label>${t.name}</label><input id="nm" autocomplete="name" maxlength="40">
+        <label>${t.phone}</label><input id="ph" type="tel" inputmode="tel" autocomplete="tel" maxlength="20">
+        ${regError ? `<p class="msg bad">${regError}</p>` : ""}
+        <button class="lime" style="width:100%;margin-top:16px;font-size:18px">${t.start}</button></form></div>`;
+    } else if (player.won === "yes") {
+      body = `<div class="pcard win"><div class="big">🎁</div><h1>${t.win}</h1>
+        <p style="color:var(--navy);font-weight:700;font-size:20px">${esc(player.name)}</p>
+        ${player.claimed ? `<p class="msg ok">${t.claimed}</p>`
+          : `<div class="wincode">${esc(player.winCode)}</div><p style="color:var(--navy)">${t.showStaff}</p>
+             <div class="clock"><span class="pulse"></span><span id="clk"></span></div>`}</div>`;
+    } else if (player.won === "nogift") {
+      body = `<div class="pcard"><div class="big">🏁</div><h1>${t.noGifts}</h1></div>`;
+    } else {
+      const dots = Array.from({ length: target }, (_, i) =>
+        `<div class="dot ${i < count ? "on" : ""} ${i === newDot ? "new" : ""}">${i < count ? "✓" : ""}</div>`).join("");
+      let head = `<div class="big">🔍</div><h1>${t.hello(esc(player.name))}</h1>`;
+      let msg = `<p class="msg ok">${t.ready}</p>`;
+      if (result === "found") { head = `<div class="big">🎉</div><h1>${t.found}</h1>`; msg = `<p class="msg ok">${t.keep}</p>`; }
+      if (result === "already") msg = `<p class="msg warn">${t.already}</p>`;
+      if (result === "old") msg = `<p class="msg bad">${t.old}</p>`;
+      if (result === "expired") msg = `<p class="msg bad">${t.expired}</p>`;
+      body = `<div class="pcard">${head}<div class="dots">${dots}</div>
+        <div class="count">${t.progress(count, target)}</div>${msg}</div>`;
+    }
+
+    app.innerHTML = `<div class="player"><div class="top"><div class="logo">QR <span>HUNT</span></div>
+      <button class="langbtn" id="lg">${t.other}</button></div>${body}
+      ${pid && player && !player.won ? `<button class="notme" id="nm2">${t.notMe}</button>` : ""}</div>`;
+
+    $("#lg").onclick = () => { lang = lang === "en" ? "ar" : "en"; localStorage.setItem("qh_lang", lang); view(); };
+    if ($("#nm2")) $("#nm2").onclick = () => { localStorage.removeItem("qh_pid"); location.href = BASE; };
+    if ($("#rf")) $("#rf").onsubmit = register;
+    clearInterval(clockTimer);
+    if ($("#clk")) { const tick = () => { const c = $("#clk"); if (c) c.textContent = new Date().toLocaleTimeString(); }; tick(); clockTimer = setInterval(tick, 1000); }
+  };
+
+  async function register(e) {
+    e.preventDefault();
+    const t = T[lang];
+    const name = $("#nm").value.trim();
+    const digits = $("#ph").value.replace(/\D/g, "");
+    if (name.length < 2) { regError = t.errName; return view(); }
+    if (digits.length < 8) { regError = t.errPhone; return view(); }
+    regError = "";
+    pid = "p" + digits;
+    const existing = await Store.get("players/" + pid);
+    if (!existing) await Store.set("players/" + pid, { name, phone: $("#ph").value.trim(), created: Date.now(), count: 0 });
+    localStorage.setItem("qh_pid", pid);
+    await afterLogin();
+  }
+
+  async function processScan() {
+    const c = params.get("c");
+    if (!c) return null;
+    const conf = withDefaults(await Store.get("config"));
+    if (!conf.codes[c] || conf.activeCode !== c) return "old";
+    if (conf.rotate) { const tk = params.get("t"); if (!tk || (tk !== conf.token && tk !== conf.prevToken)) return "expired"; }
+    const p = await Store.get("players/" + pid);
+    if (!p) return null;
+    if (p.won) return null;
+    if (p.scans && p.scans[c]) return "already";
+    await Store.set(`players/${pid}/scans/${c}`, Date.now());
+    const p2 = await Store.get("players/" + pid);
+    const count = Object.keys(p2.scans || {}).length;
+    newDot = count - 1;
+    const upd = { count, last: Date.now() };
+    if (count >= conf.target && !p2.won) {
+      let ok;
+      if (conf.maxGifts > 0) ok = (await Store.tx("config/winners", w => { w = w || 0; if (w >= conf.maxGifts) return; return w + 1; })) !== undefined;
+      else { await Store.tx("config/winners", w => (w || 0) + 1); ok = true; }
+      upd.won = ok ? "yes" : "nogift"; upd.wonAt = Date.now();
+      if (ok) upd.winCode = rnd(4);
+    }
+    await Store.update("players/" + pid, upd);
+    return "found";
+  }
+
+  async function afterLogin() {
+    result = await processScan();
+    history.replaceState(null, "", BASE); // so a refresh does not rescan
+    Store.on("players/" + pid, v => {
+      player = v;
+      if (!v && pid) { localStorage.removeItem("qh_pid"); pid = null; } // player was reset by admin
+      view();
+    });
+  }
+
+  app.innerHTML = `<div class="player"><p>${T[lang].wait}</p></div>`;
+  Store.on("config", v => { cfg = withDefaults(v); view(); });
+  if (pid) afterLogin(); else view();
+}
+
+/* ================= ADMIN ================= */
+function Admin() {
+  let cfg = withDefaults(null), players = {}, search = "";
+  app.innerHTML = `<div class="admin">
+    <div class="ahead"><h1><span id="evn"></span> · Admin <span class="badge ${Store.live ? "live" : "demo"}">${Store.live ? "LIVE" : "DEMO – this device only"}</span></h1>
+      <div class="links"><a href="${BASE}#print"><button class="ghost sm">🖨 Print QR codes</button></a>
+      <a href="${BASE}#screen" target="_blank"><button class="ghost sm">🖥 Screen mode</button></a>
+      <a href="${BASE}" target="_blank"><button class="ghost sm">📱 Player page</button></a></div></div>
+    <div class="grid">
+      <div class="card"><h2>Active spot <button class="lime sm" id="next">Move to next spot ➜</button></h2>
+        <div class="active-box"><div class="qr" id="aqr"></div><div><div class="active-name" id="aname"></div>
+        <div class="muted" id="ainfo"></div></div></div></div>
+      <div class="card"><h2>Settings <button class="sm" id="save">Save</button></h2>
+        <label>Event name</label><input id="s_name">
+        <div class="row2"><div><label>Scans to win</label><input id="s_target" type="number" min="1" max="50"></div>
+        <div><label>Max gifts (0 = no limit)</label><input id="s_max" type="number" min="0"></div></div>
+        <label class="toggle"><input type="checkbox" id="s_rot"> Screen mode: change the code every</label>
+        <div class="row2"><div><input id="s_sec" type="number" min="15"></div><div class="muted" style="align-self:center">seconds (printed QR codes will not work when this is on)</div></div>
+      </div>
+      <div class="card"><h2>Spots <button class="ghost sm" id="add">+ Add 5 spots</button></h2>
+        <p class="muted" style="margin-top:0">Write where you put each code. Press Activate when you place it. Only the active one counts.</p>
+        <div class="spots" id="spots"></div></div>
+      <div class="card"><h2>Players</h2>
+        <div class="stats"><div class="stat"><b id="st_p">0</b><span>Players</span></div>
+        <div class="stat"><b id="st_w">0</b><span>Winners</span></div><div class="stat"><b id="st_g">0</b><span>Gifts given</span></div></div>
+        <input id="q" placeholder="Search name, phone or win code">
+        <div style="overflow:auto;max-height:460px;margin-top:8px"><table><thead><tr><th>Name</th><th>Progress</th><th>Status</th></tr></thead><tbody id="tb"></tbody></table></div>
+        <button class="red sm" id="reset" style="margin-top:14px">Reset all players</button></div>
+    </div></div><div id="modal"></div>`;
+
+  const fill = () => {
+    const set = (id, v) => { const el = $(id); if (document.activeElement !== el) { if (el.type === "checkbox") el.checked = v; else el.value = v; } };
+    set("#s_name", cfg.eventName); set("#s_target", cfg.target); set("#s_max", cfg.maxGifts); set("#s_rot", cfg.rotate); set("#s_sec", cfg.rotateSec);
+  };
+
+  const renderActive = () => {
+    $("#evn").textContent = cfg.eventName;
+    const a = cfg.codes[cfg.activeCode];
+    if (a) {
+      $("#aname").textContent = `#${a.n} ${a.label || ""}`;
+      $("#ainfo").innerHTML = `Active since ${timeStr(cfg.activatedAt)} · found by <b>${Object.values(players).filter(p => p.scans && p.scans[cfg.activeCode]).length}</b> players` +
+        (cfg.rotate ? `<br>Screen mode is ON — use the Screen page for this spot.` : "");
+      drawQR($("#aqr"), codeUrl(cfg.activeCode), 120);
+    } else { $("#aname").textContent = "No active spot"; $("#ainfo").textContent = "Press Activate on a spot to start the hunt."; $("#aqr").innerHTML = ""; }
+  };
+
+  const renderSpots = () => {
+    const found = {};
+    Object.values(players).forEach(p => Object.keys(p.scans || {}).forEach(c => found[c] = (found[c] || 0) + 1));
+    $("#spots").innerHTML = sortedCodes(cfg).map(([id, c]) => `<div class="spot ${id === cfg.activeCode ? "on" : ""}">
+      <div class="n">${c.n}</div><input data-lbl="${id}" value="${esc(c.label)}" placeholder="Where is it? e.g. Main gate">
+      <div class="done">${found[id] || 0} found</div>
+      <button class="sm ghost" data-qr="${id}">QR</button>
+      ${id === cfg.activeCode ? `<button class="sm green" disabled>Active</button>` : `<button class="sm" data-act="${id}">Activate</button>`}</div>`).join("");
+    document.querySelectorAll("[data-act]").forEach(b => b.onclick = () => activate(b.dataset.act));
+    document.querySelectorAll("[data-lbl]").forEach(i => i.onchange = () => Store.set(`config/codes/${i.dataset.lbl}/label`, i.value.trim()));
+    document.querySelectorAll("[data-qr]").forEach(b => b.onclick = () => showQR(b.dataset.qr));
+  };
+
+  const renderPlayers = () => {
+    const list = Object.entries(players).map(([id, p]) => ({ id, ...p, count: Object.keys(p.scans || {}).length }));
+    $("#st_p").textContent = list.length;
+    $("#st_w").textContent = list.filter(p => p.won === "yes").length;
+    $("#st_g").textContent = list.filter(p => p.claimed).length;
+    const q = search.toLowerCase();
+    const rows = list.filter(p => !q || (p.name || "").toLowerCase().includes(q) || (p.phone || "").includes(q) || (p.winCode || "").toLowerCase() === q)
+      .sort((a, b) => (b.won === "yes") - (a.won === "yes") || b.count - a.count || (a.last || 0) - (b.last || 0));
+    $("#tb").innerHTML = rows.map(p => {
+      let st = "";
+      if (p.won === "yes") st = p.claimed ? `<span class="tag given">Gift given ✓</span>`
+        : `<span class="tag win">WIN · ${esc(p.winCode)}</span> <button class="sm green" data-give="${p.id}">Give gift</button>`;
+      else if (p.won === "nogift") st = `<span class="tag nogift">Finished, no gift</span>`;
+      return `<tr><td><b>${esc(p.name)}</b><div class="muted">${esc(p.phone)}</div></td>
+        <td><b>${p.count}/${cfg.target}</b><div class="bar"><i style="width:${Math.min(100, p.count / cfg.target * 100)}%"></i></div></td><td>${st}</td></tr>`;
+    }).join("") || `<tr><td colspan="3" class="muted">No players yet.</td></tr>`;
+    document.querySelectorAll("[data-give]").forEach(b => b.onclick = () => {
+      const p = players[b.dataset.give];
+      if (confirm(`Give gift to ${p.name} (code ${p.winCode})?`)) Store.update("players/" + b.dataset.give, { claimed: Date.now() });
+    });
+  };
+
+  async function activate(id) {
+    await Store.update("config", { activeCode: id, activatedAt: Date.now(), token: rnd(6), prevToken: "" });
+    toast(`Spot #${cfg.codes[id].n} is now active`);
+  }
+  async function addSpots(k) {
+    const max = Math.max(0, ...Object.values(cfg.codes).map(c => c.n));
+    const upd = {};
+    for (let i = 1; i <= k; i++) upd["codes/" + rnd(8)] = { n: max + i, label: "" };
+    await Store.update("config", upd);
+  }
+  function showQR(id) {
+    const c = cfg.codes[id];
+    $("#modal").innerHTML = `<div class="modal" id="mbg"><div class="box"><h2 style="justify-content:center">Spot #${c.n}</h2>
+      <div class="muted">${esc(c.label)}</div><div class="qrbig" id="mqr"></div>
+      <div class="muted" style="word-break:break-all;font-size:12px">${esc(codeUrl(id))}</div>
+      <button class="ghost" style="margin-top:12px" id="mclose">Close</button></div></div>`;
+    drawQR($("#mqr"), codeUrl(id), 260);
+    $("#mclose").onclick = () => $("#modal").innerHTML = "";
+    $("#mbg").onclick = e => { if (e.target.id === "mbg") $("#modal").innerHTML = ""; };
+  }
+
+  $("#next").onclick = () => {
+    const list = sortedCodes(cfg); if (!list.length) return;
+    const i = list.findIndex(([id]) => id === cfg.activeCode);
+    activate(list[(i + 1) % list.length][0]);
+  };
+  $("#add").onclick = () => addSpots(5);
+  $("#save").onclick = async () => {
+    await Store.update("config", {
+      eventName: $("#s_name").value.trim() || "QR Hunt",
+      target: Math.max(1, parseInt($("#s_target").value) || 10),
+      maxGifts: Math.max(0, parseInt($("#s_max").value) || 0),
+      rotate: $("#s_rot").checked,
+      rotateSec: Math.max(15, parseInt($("#s_sec").value) || 60)
+    });
+    toast("Saved");
+  };
+  $("#q").oninput = e => { search = e.target.value.trim(); renderPlayers(); };
+  $("#reset").onclick = async () => {
+    if (prompt('This deletes ALL players and scans. Type RESET to confirm.') !== "RESET") return;
+    await Store.remove("players"); await Store.set("config/winners", 0); toast("All players deleted");
+  };
+
+  let first = true;
+  Store.on("config", async v => {
+    cfg = withDefaults(v);
+    if (first) { first = false; if (!Object.keys(cfg.codes).length) { await addSpots(10); return; } }
+    fill(); renderActive(); renderSpots(); renderPlayers();
+  });
+  Store.on("players", v => { players = v || {}; renderActive(); renderSpots(); renderPlayers(); });
+}
+
+/* ================= SCREEN (QR on a tablet/TV) ================= */
+function Screen() {
+  let cfg = withDefaults(null), timer = null, left = 0, lastKey = "";
+  app.innerHTML = `<div class="screen"><h1 id="sh"></h1><div class="sub">Scan me! · امسحني</div>
+    <div class="qrwrap" id="sqr"></div><div class="tbar" id="tbar"><i id="tfill"></i></div><div class="sub" id="ssub"></div></div>`;
+
+  const draw = () => {
+    $("#sh").innerHTML = esc(cfg.eventName).replace(/(\S+)$/, "<span>$1</span>");
+    const key = cfg.activeCode + "|" + (cfg.rotate ? cfg.token : "");
+    if (!cfg.activeCode) { $("#sqr").innerHTML = `<div style="color:var(--navy);padding:40px;font-size:24px;font-weight:700">The hunt starts soon<br>يبدأ التحدي قريباً</div>`; lastKey = ""; }
+    else if (key !== lastKey) { drawQR($("#sqr"), codeUrl(cfg.activeCode, cfg.rotate ? cfg.token : ""), 520); lastKey = key; }
+    $("#tbar").classList.toggle("hide", !cfg.rotate || !cfg.activeCode);
+  };
+  const rotate = () => Store.update("config", { prevToken: cfg.token || "", token: rnd(6) });
+
+  function startTimer() {
+    clearInterval(timer);
+    if (!cfg.rotate || !cfg.activeCode) { $("#ssub").textContent = ""; return; }
+    left = cfg.rotateSec;
+    const tick = () => {
+      $("#tfill").style.width = (left / cfg.rotateSec * 100) + "%";
+      $("#ssub").textContent = `New code in ${left}s`;
+      if (left <= 0) { left = cfg.rotateSec; rotate(); } else left--;
+    };
+    tick(); timer = setInterval(tick, 1000);
+  }
+
+  let sig = "";
+  Store.on("config", v => {
+    cfg = withDefaults(v); draw();
+    const s = cfg.rotate + "|" + cfg.rotateSec + "|" + cfg.activeCode;
+    if (s !== sig) { sig = s; startTimer(); }
+  });
+  // keep the screen awake when supported
+  if (navigator.wakeLock) navigator.wakeLock.request("screen").catch(() => {});
+}
+
+/* ================= PRINT ================= */
+function Print() {
+  Store.get("config").then(v => {
+    const cfg = withDefaults(v);
+    const list = sortedCodes(cfg);
+    app.innerHTML = `<div class="print"><div class="noprint" style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+      <div><b>${list.length} QR codes</b><div class="muted">Print, then cut. Each code works only while it is active.</div></div>
+      <div style="display:flex;gap:8px"><a href="${BASE}#admin"><button class="ghost">Back</button></a><button onclick="print()">🖨 Print</button></div></div>
+      <div class="pgrid">${list.map(([id, c]) => `<div class="pcode"><h3>${esc(cfg.eventName)}</h3>
+        <div style="font-weight:700;font-size:18px">Scan me! · <span style="color:var(--blue)">امسحني</span></div>
+        <div class="qr" data-id="${id}"></div><div class="lbl">Spot #${c.n}${c.label ? " · " + esc(c.label) : ""}</div></div>`).join("")}</div></div>`;
+    document.querySelectorAll(".pcode .qr").forEach(el => drawQR(el, codeUrl(el.dataset.id), 260));
+  });
+}
+
+/* ================= Router ================= */
+const route = location.hash.slice(1);
+if (route === "admin") requireAdmin(Admin);
+else if (route === "screen") requireAdmin(Screen);
+else if (route === "print") requireAdmin(Print);
+else Player();
+window.addEventListener("hashchange", () => location.reload());
+</script>
+</body>
+</html>
